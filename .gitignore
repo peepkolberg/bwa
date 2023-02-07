@@ -1,2 +1,7 @@
-results.*
+**/._*
+**/.DS_Store
+work/*
 results/*
+results.*
+slurm-*.out
+.nextflow*
