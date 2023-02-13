@@ -29,6 +29,8 @@ process bwa_mem {
 }
 
 process sort {
+    publishDir "${projectDir}/results", pattern: "$bam_sorted", mode: "copy"
+
     input:
         tuple val(sample_id), path(bam)
 
@@ -43,7 +45,10 @@ process sort {
         """
 }
 
+// Index gets published by move (not copy) but that's ok because the next process doesn't use index anyway.
 process bam_index {
+    publishDir "${projectDir}/results", pattern: "$idx", mode: "move"
+
     input:
         tuple val(sample_id), path(bam_sorted)
 
@@ -52,6 +57,7 @@ process bam_index {
 
     script:
         idx = "${bam_sorted}.bai"
+
         """
         samtools index -@ 4 $bam_sorted
         """
@@ -60,11 +66,14 @@ process bam_index {
 process flagstat {
     publishDir "${projectDir}/results", mode: "move"
 
+    // Even though this process doesn't use the index file we created in the previous process,
+    // it must still be declared in the input so the dimensionality of this input matches the
+    // output of the previous process.
     input:
         tuple val(sample_id), path(sorted), path(idx)
     
     output:
-        tuple path(sorted), path(idx), path(stat)
+        path stat
 
     script:
         stat = "${sample_id}.flagstat.tsv"
