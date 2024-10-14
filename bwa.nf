@@ -1,7 +1,6 @@
 nextflow.enable.dsl=2
 
-samples_ch = Channel.fromPath(params.samples)
-    .ifEmpty { error "Cannot find samples file: ${params.samples}" }
+samples_ch = Channel.fromPath(params.samples, checkIfExists: true)
     .splitCsv(header: true, sep: "\t", strip: true)
     .map{row -> [row.sample_id, row.fastq_1, row.fastq_2]}
 
@@ -18,18 +17,18 @@ process bwa_mem {
         bam = "${sample_id}.bam"
 
         """
-        bwa mem -t 8 \
+        bwa mem -t $task.cpus \
         ${ref_gen}/${params.ref_gen_prefix} \
         $fastq_1 $fastq_2 \
         2> ${sample_id}.err | \
-        samtools view -@ 8 -bT \
+        samtools view -@ $task.cpus -bT \
         ${ref_gen}/${params.ref_gen_prefix}.fa \
         > $bam
         """
 }
 
 process sort {
-    publishDir "${projectDir}/results", pattern: "$bam_sorted", mode: "copy"
+    publishDir "$params.outdir", pattern: "$bam_sorted", mode: "copy"
 
     input:
         tuple val(sample_id), path(bam)
@@ -41,12 +40,12 @@ process sort {
         bam_sorted = "${sample_id}.sorted.bam"
 
         """
-        samtools sort -@ 4 -O bam -o $bam_sorted -T temp $bam 
+        samtools sort -@ $task.cpus -O bam -o $bam_sorted -T temp $bam 
         """
 }
 
 process bam_index {
-    publishDir "${projectDir}/results", pattern: "$idx", mode: "move"
+    publishDir "$params.outdir", pattern: "$idx", mode: "copy"
 
     input:
         tuple val(sample_id), path(bam_sorted)
@@ -58,12 +57,12 @@ process bam_index {
         idx = "${bam_sorted}.bai"
 
         """
-        samtools index -@ 4 $bam_sorted
+        samtools index -@ $task.cpus $bam_sorted
         """
 }
 
 process flagstat {
-    publishDir "${projectDir}/results", mode: "move"
+    publishDir "$params.outdir", mode: "copy"
 
     input:
         tuple val(sample_id), path(sorted)
@@ -76,7 +75,7 @@ process flagstat {
 
         // There is also a more comprehensive samtools 'stats' command.
         """
-        samtools flagstats -@ 4 -O tsv $sorted > $stat
+        samtools flagstats -@ $task.cpus -O tsv $sorted > $stat
         """
 }
 
