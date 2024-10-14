@@ -19,4 +19,5 @@ nextflow -log logs/.nextflow.log run bwa.nf -profile tartu_hpc \
     --samples data/samples.tsv \
     --ref_gen bwa_idx \
     --ref_gen_prefix $ref_gen_prefix \
+    --outdir results \
     -resume
